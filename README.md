@@ -26,8 +26,8 @@ To configure the relay follow the usage instructions:
 		host for lnd's REST api (default "https://127.0.0.1:8080")
 	-lnd-cert string
 		lnd's self-signed cert (set to empty string for no-rest-tls=true) (default ".lnd/tls.cert")
-	-port string
-		http port over which to expose api (default "4747")
+	-listen string
+		interface and port over which to expose api (default "localhost:4747")
 
 Run the binary:
 
