@@ -9,29 +9,54 @@ for example:
 
 To configure the relay follow the usage instructions:
 
-	usage: ./lnproxy [flags] lnproxy.macaroon
-	lnproxy.macaroon
-		Path to lnproxy macaroon. Generate it with:
-			lncli bakemacaroon --save_to lnproxy.macaroon
-				uri:/lnrpc.Lightning/DecodePayReq \
-				uri:/lnrpc.Lightning/LookupInvoice \
-				uri:/invoicesrpc.Invoices/AddHoldInvoice \
-				uri:/invoicesrpc.Invoices/SubscribeSingleInvoice \
-				uri:/invoicesrpc.Invoices/CancelInvoice \
-				uri:/invoicesrpc.Invoices/SettleInvoice \
-				uri:/routerrpc.Router/SendPaymentV2 \
-				uri:/routerrpc.Router/EstimateRouteFee \
-				uri:/chainrpc.ChainKit/GetBestBlock
-	-lnd string
-		host for lnd's REST api (default "https://127.0.0.1:8080")
-	-lnd-cert string
-		lnd's self-signed cert (set to empty string for no-rest-tls=true) (default ".lnd/tls.cert")
-	-listen string
-		interface and port over which to expose api (default "localhost:4747")
+	usage: ./lnproxy [flags]
+		-cltv-delta-alpha uint
+				cltv delta alpha (default 42)
+		-cltv-delta-beta uint
+				cltv delta beta (default 42)
+		-listen string
+				interface and port over which to expose api (default "localhost:4747")
+		-lnd string
+				host for lnd's REST api (default "https://127.0.0.1:8080")
+		-lnd-cert string
+				path to lnd's self-signed cert (set to empty string for no-rest-tls=true) or base64 encoded cert or hex encoded cert (default ".lnd/tls.cert")
+		-lnd-macaroon string
+				a path to an lnproxy macaroon or a base64 encoded macaroon or a hex encoded macaroon
+				Generate it with:
+					lncli bakemacaroon --save_to lnproxy.macaroon \
+						uri:/lnrpc.Lightning/DecodePayReq \
+						uri:/lnrpc.Lightning/LookupInvoice \
+						uri:/invoicesrpc.Invoices/AddHoldInvoice \
+						uri:/invoicesrpc.Invoices/SubscribeSingleInvoice \
+						uri:/invoicesrpc.Invoices/CancelInvoice \
+						uri:/invoicesrpc.Invoices/SettleInvoice \
+						uri:/routerrpc.Router/SendPaymentV2 \
+						uri:/routerrpc.Router/EstimateRouteFee \
+						uri:/chainrpc.ChainKit/GetBestBlock (default ".lnd/data/chain/bitcoin/mainnet/invoice.macaroon")
+		-max-amount-msat uint
+				maximum amount in msat to relay (default 1000000000)
+		-max-cltv-expiry uint
+				maximum cltv expiry (default 1800)
+		-min-amount-msat uint
+				minimum amount in msat to relay (default 10000)
+		-min-cltv-expiry uint
+				minimum cltv expiry (default 200)
+		-payment-time-preference float
+				payment time preference (default 0.9)
+		-payment-timeout uint
+				payment timeout (default 60)
+		-routing-budget-beta uint
+				routing budget beta in msat (default 1500000)
+		-routing-fee-base-msat uint
+				routing fee base in msat (default 1000)
+		-routing-fee-ppm uint
+				routing fee ppm (default 1000)
+
+All the flags take precendence over corresponding environment variables, for example `-cltv-delta-alpha` can be set with `CTLV_DELTA_ALPHA`.
 
 Run the binary:
 
-	$ ./lnproxy-http-relay-openbsd-amd64-00000000 lnproxy.macaroon
+	$ ./lnproxy-http-relay-openbsd-amd64-00000000 -lnd-macaroon lnproxy.macaroon
 	1970/01/01 00:00:00 HTTP server listening on: localhost:4747
 
 and on a separate terminal, test with:
