@@ -205,6 +205,9 @@ Generate it with:
 	lnproxy_relay = relay.NewRelayWithRelayParameters(lnd, params)
 
 	http.HandleFunc("/spec", specApiHandler)
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "OK")
+	})
 
 	server := &http.Server{
 		Addr:              *listen,
