@@ -39,6 +39,36 @@ type RelayParameters struct {
 	PaymentTimePreference float64
 }
 
+func NewRelayParameters() RelayParameters {
+	return RelayParameters{
+		MinAmountMsat:      10_000,
+		MaxAmountMsat:      1_000_000_000,
+		ExpiryBuffer:       300,
+		MaxExpiry:          604800, // 60*60*24*7 one week
+		MinFeeBudgetMsat:   1000,
+		RoutingBudgetAlpha: 1000,
+		RoutingBudgetBeta:  1_500_000,
+		RoutingFeeBaseMsat: 1000,
+		RoutingFeePPM:      1000,
+		CltvDeltaAlpha:     42,
+		CltvDeltaBeta:      42,
+		// Should be set to at most the node's `--max-cltv-expiry` setting (default: 2016)
+		MaxCltvExpiry: 1800,
+		MinCltvExpiry: 200,
+		// Should be set so that CltvDeltaAlpha blocks are very unlikely to be added before timeout
+		PaymentTimeout:        60,
+		PaymentTimePreference: 0.9,
+	}
+}
+
+// Returns a Relay with provided RelayParameters
+func NewRelayWithRelayParameters(ln lnc.LN, relayParameters RelayParameters) *Relay {
+	return &Relay{
+		RelayParameters: relayParameters,
+		LN:              ln,
+	}
+}
+
 // Returns a Relay with with sane defaults
 func NewRelay(ln lnc.LN) *Relay {
 	return &Relay{
