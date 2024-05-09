@@ -119,7 +119,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 		log.Println("route estimation error:", err)
 		return nil, 0, errors.Join(ErrorClientFacing, errors.New("could not find route"))
 	}
-	for flag, _ := range p.Features {
+	for flag := range p.Features {
 		switch flag {
 		case "8", "9", "14", "15", "16", "17", "25", "48", "49", "149", "151":
 			// 25 is route blinding
