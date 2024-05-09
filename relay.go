@@ -11,7 +11,7 @@ import (
 	"github.com/lnproxy/lnc"
 )
 
-var ClientFacing = errors.New("")
+var ErrorClientFacing = errors.New("")
 
 type Relay struct {
 	RelayParameters
@@ -72,26 +72,8 @@ func NewRelayWithRelayParameters(ln lnc.LN, relayParameters RelayParameters) *Re
 // Returns a Relay with with sane defaults
 func NewRelay(ln lnc.LN) *Relay {
 	return &Relay{
-		RelayParameters: RelayParameters{
-			MinAmountMsat:      10_000,
-			MaxAmountMsat:      1_000_000_000,
-			ExpiryBuffer:       300,
-			MaxExpiry:          604800, // 60*60*24*7 one week
-			MinFeeBudgetMsat:   1000,
-			RoutingBudgetAlpha: 1000,
-			RoutingBudgetBeta:  1_500_000,
-			RoutingFeeBaseMsat: 1000,
-			RoutingFeePPM:      1000,
-			CltvDeltaAlpha:     42,
-			CltvDeltaBeta:      42,
-			// Should be set to at most the node's `--max-cltv-expiry` setting (default: 2016)
-			MaxCltvExpiry: 1800,
-			MinCltvExpiry: 200,
-			// Should be set so that CltvDeltaAlpha blocks are very unlikely to be added before timeout
-			PaymentTimeout:        60,
-			PaymentTimePreference: 0.9,
-		},
-		LN: ln,
+		RelayParameters: NewRelayParameters(),
+		LN:              ln,
 	}
 }
 
@@ -123,19 +105,19 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 	}
 
 	if p.NumMsat == 0 {
-		return nil, 0, errors.Join(ClientFacing, errors.New("zero amount invoices cannot be relayed trustlessly"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("zero amount invoices cannot be relayed trustlessly"))
 	}
 	if p.NumMsat < relay.MinAmountMsat {
-		return nil, 0, errors.Join(ClientFacing, errors.New("invoice amount too low"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("invoice amount too low"))
 	}
 	if p.NumMsat > relay.MaxAmountMsat {
-		return nil, 0, errors.Join(ClientFacing, errors.New("invoice amount too high"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("invoice amount too high"))
 	}
 
 	min_fee_budget_msat, min_cltv_delta, err := relay.LN.EstimateRoutingFee(*p, 0)
 	if err != nil {
 		log.Println("route estimation error:", err)
-		return nil, 0, errors.Join(ClientFacing, errors.New("could not find route"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("could not find route"))
 	}
 	for flag, _ := range p.Features {
 		switch flag {
@@ -145,7 +127,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 			// 148/149 is trampoline routing
 			// 150/151 is electrum's trampoline
 		default:
-			return nil, 0, errors.Join(ClientFacing, fmt.Errorf("unknown feature flag: %s", flag))
+			return nil, 0, errors.Join(ErrorClientFacing, fmt.Errorf("unknown feature flag: %s", flag))
 		}
 	}
 
@@ -157,7 +139,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 	q.Hash = hash
 
 	if x.Description != nil && x.DescriptionHash != nil {
-		return nil, 0, errors.Join(ClientFacing, errors.New("description and description hash cannot both be set"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("description and description hash cannot both be set"))
 	} else if x.Description != nil {
 		q.Memo = *x.Description
 	} else if x.DescriptionHash != nil {
@@ -177,7 +159,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 	}
 
 	if p.Timestamp+p.Expiry < uint64(time.Now().Unix())+relay.ExpiryBuffer {
-		return nil, 0, errors.Join(ClientFacing, errors.New("payment request expiration is too close."))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("payment request expiration is too close"))
 	}
 	expiry := p.Expiry
 	if expiry > relay.MaxExpiry {
@@ -187,7 +169,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 
 	q.CltvExpiry = min_cltv_delta + relay.CltvDeltaBeta + relay.CltvDeltaAlpha
 	if q.CltvExpiry >= relay.MaxCltvExpiry {
-		return nil, 0, errors.Join(ClientFacing, errors.New("cltv_expiry is too long"))
+		return nil, 0, errors.Join(ErrorClientFacing, errors.New("cltv_expiry is too long"))
 	} else if q.CltvExpiry < relay.MinCltvExpiry {
 		q.CltvExpiry = relay.MinCltvExpiry
 	}
@@ -195,7 +177,7 @@ func (relay *Relay) wrap(x ProxyParameters) (proxy_invoice_params *lnc.InvoicePa
 	routing_fee_msat := relay.RoutingFeeBaseMsat + (p.NumMsat*relay.RoutingFeePPM)/1_000_000
 	if x.RoutingMsat != nil {
 		if *x.RoutingMsat < (relay.MinFeeBudgetMsat + routing_fee_msat) {
-			return nil, 0, errors.Join(ClientFacing, errors.New("custom fee budget too low"))
+			return nil, 0, errors.Join(ErrorClientFacing, errors.New("custom fee budget too low"))
 		}
 		q.ValueMsat = p.NumMsat + *x.RoutingMsat
 		return &q, *x.RoutingMsat - routing_fee_msat, nil
@@ -216,7 +198,7 @@ func (relay *Relay) OpenCircuit(x ProxyParameters) (string, error) {
 
 	proxy_invoice, err := relay.LN.AddInvoice(*proxy_invoice_params)
 	if errors.Is(err, lnc.PaymentHashExists) {
-		return "", errors.Join(ClientFacing, lnc.PaymentHashExists)
+		return "", errors.Join(ErrorClientFacing, lnc.PaymentHashExists)
 	} else if err != nil {
 		return "", err
 	}
@@ -231,7 +213,7 @@ func (relay *Relay) circuitSwitch(hash []byte, invoice string, fee_budget_msat u
 	defer relay.WaitGroup.Done()
 	log.Println("opened circuit for:", invoice, hex.EncodeToString(hash))
 	invoice_state, err := relay.LN.WatchInvoice(hash)
-	if err != nil || invoice_state.State != lnc.Accepted {
+	if err != nil || invoice_state.State != lnc.Accepted || invoice_state.CltvExpiryDelta-relay.CltvDeltaAlpha <= 0 {
 		log.Println("error while watching wrapped invoice:", hex.EncodeToString(hash), invoice_state.State, err)
 		if invoice_state.State != lnc.Canceled {
 			err = relay.LN.CancelInvoice(hash)
@@ -263,5 +245,4 @@ func (relay *Relay) circuitSwitch(hash []byte, invoice string, fee_budget_msat u
 		log.Panicln("error while settling original invoice:", hex.EncodeToString(hash), err)
 	}
 	log.Println("circuit settled")
-	return
 }
